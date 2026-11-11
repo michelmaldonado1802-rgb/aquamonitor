@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AquaMonitor</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 4C14 13 8 19 8 26a12 12 0 0 0 24 0c0-7-6-13-12-22Z" fill="var(--accent)"/><path d="M14 27c1.5 3.2 4 4.8 7 4.8" stroke="var(--accent-ink)" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>
+      <div><h1>AquaMonitor</h1><p class="tag">Calidad del agua y saneamiento, reportado por la comunidad · ODS 6</p></div>
+    </div>
+  </header>
+  <nav role="tablist" aria-label="Secciones">
+    <button role="tab" id="t-panel" data-view="panel" aria-selected="true">Panel de zonas</button>
+    <button role="tab" id="t-reportar" data-view="reportar" aria-selected="false">Reportar un problema</button>
+    <button role="tab" id="t-reportes" data-view="reportes" aria-selected="false">Reportes <span id="openCount"></span></button>
+    <button role="tab" id="t-acerca" data-view="acerca" aria-selected="false">Acerca del proyecto</button>
+  </nav>
+
+  <main>
+    <section id="v-panel">
+      <h2>Estado del agua por zona</h2>
+      <p class="sub">Cada zona combina la última medición con los reportes abiertos de vecinos. Toca una zona para ver sus reportes.</p>
+      <div class="zones" id="zones"></div>
+      <p class="note">Mediciones y reportes de ejemplo para el prototipo. Rangos de referencia, ajustables según la norma que aplique el equipo.</p>
+      <div class="panel" style="margin-top:18px">
+        <h2>Registrar una medición</h2>
+        <p class="sub">Para quien toma muestras en campo. La zona se actualiza al guardar.</p>
+        <form id="fMeas" novalidate>
+          <div class="row">
+            <label>Zona<select id="mZone" required></select></label>
+            <label>pH<input id="mPh" type="number" step="0.1" min="0" max="14" inputmode="decimal" placeholder="7.2"></label>
+            <label>Turbidez (UTN)<input id="mTurb" type="number" step="0.1" min="0" inputmode="decimal" placeholder="1.5"></label>
+            <label>Cloro residual (mg/L)<input id="mCl" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0.60"></label>
+          </div>
+          <p class="err" id="mErr" role="alert"></p>
+          <button class="btn" type="submit">Guardar medición</button>
+        </form>
+        <div class="limits" id="limits"></div>
+      </div>
+    </section>
+
+    <section id="v-reportar" hidden>
+      <h2>Reportar un problema</h2>
+      <p class="sub">Cuéntanos qué pasa en tu colonia. Un reporte claro ayuda a que se atienda más rápido.</p>
+      <div class="panel">
+        <form id="fRep" novalidate>
+          <div class="row">
+            <label>Zona<select id="rZone" required></select></label>
+            <label>Tipo de problema<select id="rType" required></select></label>
+          </div>
+          <label>Calle o referencia<input id="rPlace" type="text" maxlength="90" placeholder="Ej. Av. Tonalá, frente a la escuela primaria"></label>
+          <div>
+            <div style="font-weight:600;font-size:13.5px;margin-bottom:6px">Gravedad</div>
+            <div class="sev" role="radiogroup" aria-label="Gravedad">
+              <label><input type="radio" name="sev" value="baja"> Baja</label>
+              <label><input type="radio" name="sev" value="media" checked> Media</label>
+              <label><input type="radio" name="sev" value="alta"> Alta</label>
+            </div>
+          </div>
+          <label>Descripción<textarea id="rDesc" maxlength="400" placeholder="Desde cuándo ocurre, a cuántas casas afecta, color u olor del agua…"></textarea></label>
+          <p class="err" id="rErr" role="alert"></p>
+          <button class="btn" type="submit">Enviar reporte</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="v-reportes" hidden>
+      <h2>Reportes de la comunidad</h2>
+      <p class="sub">Quien atiende puede avanzar el estado de cada reporte: Nuevo, En atención y Resuelto.</p>
+      <div class="filters">
+        <label>Zona<select id="fZone"></select></label>
+        <label>Tipo<select id="fType"></select></label>
+        <label>Estado<select id="fStatus"><option value="">Todos</option><option value="nuevo">Nuevo</option><option value="atencion">En atención</option><option value="resuelto">Resuelto</option></select></label>
+      </div>
+      <div class="list" id="list"></div>
+      <p class="note"><button class="reset" id="resetData" type="button">Restaurar datos de ejemplo</button></p>
+    </section>
+
+    <section id="v-acerca" hidden>
+      <h2>Acerca de AquaMonitor</h2>
+      <p class="sub">Prototipo del proyecto integrador de ingeniería de software, enfocado en el ODS 6: agua limpia y saneamiento.</p>
+      <div class="ods">
+        <div><h3>Problema</h3><p>Los vecinos notan fallas en el agua antes que cualquier autoridad, pero no tienen un canal claro para reportarlas ni para ver si alguien las atendió.</p></div>
+        <div><h3>Qué hace la app</h3><p>Recibe reportes ciudadanos, los cruza con mediciones de campo y muestra por zona si el agua cumple los rangos de referencia.</p></div>
+        <div><h3>Quién la usa</h3><p>Vecinos que reportan, personal técnico que mide y atiende, y autoridades que consultan el panel.</p></div>
+        <div><h3>Siguiente versión</h3><p>Base de datos compartida, cuentas por rol, fotos en los reportes y mapa geográfico real.</p></div>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="toast" role="status" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
+
