@@ -1,6 +1,23 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getFirestore, collection, doc, getDoc, setDoc, updateDoc,
+  onSnapshot, runTransaction, writeBatch
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDl1KaOZpygIN8f_dmPQq6iEziqOoOuJmQ",
+  authDomain: "aquamonitor-3268a.firebaseapp.com",
+  projectId: "aquamonitor-3268a",
+  storageBucket: "aquamonitor-3268a.firebasestorage.app",
+  messagingSenderId: "1091569468767",
+  appId: "1:1091569468767:web:70ef2c0ea599ddae03a2ea"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+const counterRef = doc(db, "meta", "contador");
 
 (function(){
-  var KEY="aquamonitor-v1";
   var ZONES=["Centro de Tonalá","Loma Dorada","Santa Paula","Coyula","Zalatitán","Basilio Vadillo"];
   var TYPES={turbia:"Agua turbia o con color",olor:"Mal olor o sabor",fuga:"Fuga en la vía pública",drenaje:"Drenaje desbordado",sinagua:"Sin servicio de agua"};
   var LIM={ph:[6.5,8.5],turb:[0,4],cl:[0.2,1.5]};
@@ -27,11 +44,41 @@
       {id:5,zone:"Coyula",type:"olor",place:"Calle Independencia",sev:"baja",desc:"El agua huele a cloro más fuerte de lo normal en la mañana.",status:"resuelto",date:daysAgo(6)},
       {id:6,zone:"Centro de Tonalá",type:"fuga",place:"Plaza principal",sev:"baja",desc:"Gotea una válvula junto a la banqueta.",status:"resuelto",date:daysAgo(8)}
     ]};}
-  var S;
-  function load(){try{var r=localStorage.getItem(KEY);if(r){var o=JSON.parse(r);if(o&&o.reports&&o.readings)return o;}}catch(e){}return sample();}
-  function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
-  S=load();
 
+  // Estado en memoria: se llena con lo que llega de Firestore
+  var S={seq:0,readings:{},reports:[]};
+
+  // ---------- Firestore ----------
+  function seedBatch(batch,data){
+    data.reports.forEach(function(r){batch.set(doc(db,"reportes",String(r.id)),r);});
+    Object.keys(data.readings).forEach(function(z){batch.set(doc(db,"mediciones",z),data.readings[z]);});
+    batch.set(counterRef,{seq:data.seq});
+  }
+
+  async function seedIfEmpty(){
+    try{
+      var c=await getDoc(counterRef);
+      if(!c.exists()){
+        var b=writeBatch(db);
+        seedBatch(b,sample());
+        await b.commit();
+      }
+    }catch(e){console.error(e);toast("No se pudo conectar con la base de datos");}
+  }
+
+  function listen(){
+    onSnapshot(collection(db,"reportes"),function(snap){
+      S.reports=snap.docs.map(function(d){return Object.assign({},d.data(),{id:Number(d.id)});});
+      renderZones();renderList();
+    },function(e){console.error(e);toast("Error al leer los reportes");});
+
+    onSnapshot(collection(db,"mediciones"),function(snap){
+      var r={};snap.forEach(function(d){r[d.id]=d.data();});
+      S.readings=r;renderZones();
+    },function(e){console.error(e);toast("Error al leer las mediciones");});
+  }
+
+  // ---------- Utilidades ----------
   function $(id){return document.getElementById(id);}
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
   function fdate(iso){try{return new Date(iso).toLocaleDateString("es-MX",{day:"numeric",month:"short"});}catch(e){return "";}}
@@ -91,7 +138,11 @@
       c.appendChild(el("p",null,x.desc));
       var f=el("div","rf");f.appendChild(el("span",null,"Enviado el "+fdate(x.date)));
       var b=el("button","btn ghost",NEXTLABEL[x.status]);b.type="button";
-      b.addEventListener("click",function(){x.status=NEXT[x.status];save();renderZones();renderList();});
+      b.addEventListener("click",async function(){
+        try{
+          await updateDoc(doc(db,"reportes",String(x.id)),{status:NEXT[x.status]});
+        }catch(e){console.error(e);toast("No se pudo cambiar el estado");}
+      });
       f.appendChild(b);c.appendChild(f);
       box.appendChild(c);
     });
@@ -125,7 +176,8 @@
   var toastT;
   function toast(msg){var t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){t.hidden=true;},2800);}
 
-  $("fRep").addEventListener("submit",function(e){
+  // ---------- Enviar reporte ----------
+  $("fRep").addEventListener("submit",async function(e){
     e.preventDefault();
     var z=$("rZone").value,t=$("rType").value,d=$("rDesc").value.trim(),p=$("rPlace").value.trim();
     var sev=document.querySelector('input[name="sev"]:checked').value;
@@ -134,28 +186,66 @@
     if(!t){err.textContent="Elige el tipo de problema.";$("rType").focus();return;}
     if(d.length<10){err.textContent="Describe el problema con al menos 10 caracteres.";$("rDesc").focus();return;}
     err.textContent="";
-    S.seq=(S.seq||0)+1;
-    S.reports.push({id:S.seq,zone:z,type:t,place:p,sev:sev,desc:d,status:"nuevo",date:new Date().toISOString()});
-    save();$("fRep").reset();
+
+    var folio;
+    try{
+      // El folio se incrementa dentro de una transacción para que no se repita
+      folio=await runTransaction(db,async function(tx){
+        var c=await tx.get(counterRef);
+        var n=(c.exists()?c.data().seq:6)+1;
+        tx.set(counterRef,{seq:n});
+        tx.set(doc(db,"reportes",String(n)),{
+          id:n,zone:z,type:t,place:p,sev:sev,desc:d,status:"nuevo",date:new Date().toISOString()
+        });
+        return n;
+      });
+    }catch(ex){
+      console.error(ex);
+      err.textContent="No se pudo enviar el reporte. Revisa tu conexión e inténtalo de nuevo.";
+      return;
+    }
+
+    $("fRep").reset();
     $("fZone").value=z;$("fType").value="";$("fStatus").value="";
-    renderZones();renderList();show("reportes");
-    toast("Reporte AQM-"+String(S.seq).padStart(4,"0")+" enviado");
+    renderList();show("reportes");
+    toast("Reporte AQM-"+String(folio).padStart(4,"0")+" enviado");
   });
 
-  $("fMeas").addEventListener("submit",function(e){
+  // ---------- Guardar medición ----------
+  $("fMeas").addEventListener("submit",async function(e){
     e.preventDefault();
     var z=$("mZone").value,ph=parseFloat($("mPh").value),tb=parseFloat($("mTurb").value),cl=parseFloat($("mCl").value),err=$("mErr");
     if(isNaN(ph)||isNaN(tb)||isNaN(cl)){err.textContent="Captura pH, turbidez y cloro residual.";return;}
     if(ph<0||ph>14){err.textContent="El pH debe estar entre 0 y 14.";return;}
     if(tb<0||cl<0){err.textContent="Turbidez y cloro no pueden ser negativos.";return;}
     err.textContent="";
-    S.readings[z]={ph:ph,turb:tb,cl:cl,date:new Date().toISOString()};
-    save();$("fMeas").reset();$("mZone").value=z;renderZones();
+    try{
+      await setDoc(doc(db,"mediciones",z),{ph:ph,turb:tb,cl:cl,date:new Date().toISOString()});
+    }catch(ex){
+      console.error(ex);
+      err.textContent="No se pudo guardar la medición. Revisa tu conexión.";
+      return;
+    }
+    $("fMeas").reset();$("mZone").value=z;
     toast("Medición guardada en "+z);
   });
 
   ["fZone","fType","fStatus"].forEach(function(id){$(id).addEventListener("change",renderList);});
-  $("resetData").addEventListener("click",function(){S=sample();save();renderZones();renderList();toast("Datos de ejemplo restaurados");});
+
+  // Restaurar datos de ejemplo (afecta a todos, porque la base de datos es compartida)
+  $("resetData").addEventListener("click",async function(){
+    try{
+      var data=sample();
+      var b=writeBatch(db);
+      var keep={};data.reports.forEach(function(r){keep[r.id]=true;});
+      S.reports.forEach(function(r){if(!keep[r.id])b.delete(doc(db,"reportes",String(r.id)));});
+      seedBatch(b,data);
+      await b.commit();
+      toast("Datos de ejemplo restaurados");
+    }catch(ex){console.error(ex);toast("No se pudieron restaurar los datos");}
+  });
 
   fillSelects();renderZones();renderList();show(location.hash.slice(1));
+  seedIfEmpty();
+  listen();
 })();

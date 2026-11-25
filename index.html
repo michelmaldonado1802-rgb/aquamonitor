@@ -27,7 +27,7 @@
       <h2>Estado del agua por zona</h2>
       <p class="sub">Cada zona combina la última medición con los reportes abiertos de vecinos. Toca una zona para ver sus reportes.</p>
       <div class="zones" id="zones"></div>
-      <p class="note">Mediciones y reportes de ejemplo para el prototipo. Rangos de referencia, ajustables según la norma que aplique el equipo.</p>
+      <p class="note">Los reportes y mediciones se guardan en una base de datos compartida (Firebase Firestore) y se actualizan en tiempo real. Rangos de referencia, ajustables según la norma que aplique el equipo.</p>
       <div class="panel" style="margin-top:18px">
         <h2>Registrar una medición</h2>
         <p class="sub">Para quien toma muestras en campo. La zona se actualiza al guardar.</p>
@@ -89,13 +89,13 @@
         <div><h3>Problema</h3><p>Los vecinos notan fallas en el agua antes que cualquier autoridad, pero no tienen un canal claro para reportarlas ni para ver si alguien las atendió.</p></div>
         <div><h3>Qué hace la app</h3><p>Recibe reportes ciudadanos, los cruza con mediciones de campo y muestra por zona si el agua cumple los rangos de referencia.</p></div>
         <div><h3>Quién la usa</h3><p>Vecinos que reportan, personal técnico que mide y atiende, y autoridades que consultan el panel.</p></div>
-        <div><h3>Siguiente versión</h3><p>Base de datos compartida, cuentas por rol, fotos en los reportes y mapa geográfico real.</p></div>
+            <div><h3>Siguiente versión</h3><p>Cuentas por rol (vecino, técnico y autoridad), fotos en los reportes, mapa geográfico real y reglas de seguridad más estrictas en la base de datos.</p></div>
       </div>
     </section>
   </main>
 </div>
 <div id="toast" role="status" hidden></div>
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
 
